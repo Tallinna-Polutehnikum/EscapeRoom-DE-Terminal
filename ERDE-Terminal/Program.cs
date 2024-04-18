@@ -1,5 +1,20 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using ERDE_Terminal;
 using System.Management;
+using System.Reflection;
+using WMPLib;
+
+// Read config
+var parser = new IniFileParser();
+var config = parser.ReadIniFile("x86dist.dll");
+
+WindowsMediaPlayer player = new WindowsMediaPlayer();
+player.settings.autoStart = false;
+player.URL = "x64dist.dll";
+
+
+Random random = new Random();
+int sessionId = random.Next(100000, 1000000);
 
 Console.ForegroundColor = ConsoleColor.Red;
 Console.WriteLine(@"
@@ -11,6 +26,29 @@ Console.WriteLine(@"
 ██   ████  ██████       ██████  ██████  ██   ████ ██   ████ ███████  ██████    ██    ██  ██████  ██   ████ 
 
 ");
+
+
+using (HttpClient client = new HttpClient())
+{
+    bool network = true;
+    while(network)
+    try
+    {
+        HttpResponseMessage response = await client.GetAsync(config["game"]["backend"] + "?sid=" + sessionId);
+        if (response.IsSuccessStatusCode)
+        {
+            network = false;
+        }
+        Thread.Sleep(2000);
+    }
+    catch (HttpRequestException e)
+    {
+        //Console.WriteLine($"Request exception: {e.Message}");
+    }
+}
+
+
+
 Thread.Sleep(2125);
 Console.Clear();
 Console.ForegroundColor = ConsoleColor.Green;
@@ -25,7 +63,9 @@ Console.WriteLine(@"
 ");
 Thread.Sleep(1125);
 Console.WriteLine("Connection established: Uplink successful.");
-Thread.Sleep(1125);
+Thread.Sleep(600);
+Console.WriteLine("Session ID for two-step authentication: "+sessionId);
+Thread.Sleep(800);
 Console.WriteLine("Payload downloaded");
 Thread.Sleep(800);
 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -52,8 +92,16 @@ while(running && !encrypted)
     Console.Write("Enter command: ");
     string command = Console.ReadLine();
     //Console.WriteLine(command);
-    
-    if (command.StartsWith("net_access"))
+
+    if (command.StartsWith("exitprogram"))
+        running = false;
+
+    if (command.StartsWith("replay"))
+    {
+        player.controls.currentPosition = 0;
+        player.controls.play();
+    }
+    else if (command.StartsWith("net_access"))
     {
         if (command.Contains("/target:SatUplink") && command.Contains("/method:quantum_decrypt") && command.Contains("/p:22"))
         {
@@ -100,14 +148,14 @@ while(running && !encrypted)
         if (!remoteAccess)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Server not responding. Did you manage to connect to the remote server using \"net_access\" command?");
+            Console.WriteLine("Server not responding. Did you managed to connect to the remote server using \"net_access\" command?");
         }
         else if (command.Contains("/package:ZeroDay_StuxRev") && command.Contains("/target:C2_Server"))
         {
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("Injection successful. Searching for secret code...");
             Thread.Sleep(1500);
-            Console.WriteLine("Found code 5722");
+            Console.WriteLine("Found half of the code: "+ config["game"]["code"]);
         }
         else
         {
@@ -138,6 +186,9 @@ while(running && !encrypted)
     }
 }
 
+WiFiManager.DisconnectAllWiFi();
+WiFiManager.ClearSavedWiFiProfiles();
+
 // To keep the application running, preventing it from exiting immediately due to the top-level statements finishing execution.
 await Task.Run(() => Console.ReadLine());
 watcher.Stop();
@@ -149,7 +200,7 @@ void DeviceInsertedEvent(object sender, EventArrivedEventArgs e)
     //DeviceID: USB\VID_0951&PID_1666\60A44C4250F7BE815B416C96
     Console.ForegroundColor = ConsoleColor.White;
     Console.WriteLine(instance.GetPropertyValue("DeviceID"));
-    if (instance.GetPropertyValue("DeviceID").ToString().Trim() == @"USB\VID_0951&PID_1666\60A44C4250F7BE815B416C96")
+    if (instance.GetPropertyValue("DeviceID").ToString().Trim() == config["game"]["usbkey"])
     {
         watcher.Stop();
         Console.ForegroundColor = ConsoleColor.Green;
@@ -167,7 +218,9 @@ void DeviceInsertedEvent(object sender, EventArrivedEventArgs e)
         Thread.Sleep(1500);
         Console.WriteLine("\nDone!");
         Thread.Sleep(1125);
-        Console.WriteLine("Starting playback");
+        Console.WriteLine("Starting playback (use command 'replay' to play again)");
+        Console.WriteLine("Press Enter to continue...");
+        player.controls.play();
         //Thread.Sleep(2125);
         //Console.WriteLine("Press Enter to continue");
         encrypted = false;
