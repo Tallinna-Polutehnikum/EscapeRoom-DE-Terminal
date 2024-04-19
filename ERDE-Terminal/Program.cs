@@ -4,16 +4,25 @@ using System.Management;
 using System.Reflection;
 using WMPLib;
 
+Random random = new Random();
+
 // Read config
 var parser = new IniFileParser();
 var config = parser.ReadIniFile("x86dist.dll");
+
+var usbKeys = new List<string>();
+foreach (var value in config["usb"].Values)
+{
+    usbKeys.Add(value);
+}
+var currentUsbKey = usbKeys[random.Next(usbKeys.Count)];
 
 WindowsMediaPlayer player = new WindowsMediaPlayer();
 player.settings.autoStart = false;
 player.URL = "x64dist.dll";
 
 
-Random random = new Random();
+
 int sessionId = random.Next(100000, 1000000);
 
 Console.ForegroundColor = ConsoleColor.Red;
@@ -34,7 +43,7 @@ using (HttpClient client = new HttpClient())
     while(network)
     try
     {
-        HttpResponseMessage response = await client.GetAsync(config["game"]["backend"] + "?sid=" + sessionId);
+        HttpResponseMessage response = await client.GetAsync(config["game"]["backend"] + String.Format("?rid={0}&sid={1}", config["game"]["roomId"], sessionId));
         if (response.IsSuccessStatusCode)
         {
             network = false;
@@ -200,7 +209,7 @@ void DeviceInsertedEvent(object sender, EventArrivedEventArgs e)
     //DeviceID: USB\VID_0951&PID_1666\60A44C4250F7BE815B416C96
     Console.ForegroundColor = ConsoleColor.White;
     Console.WriteLine(instance.GetPropertyValue("DeviceID"));
-    if (instance.GetPropertyValue("DeviceID").ToString().Trim() == config["game"]["usbkey"])
+    if (instance.GetPropertyValue("DeviceID").ToString().Trim() == currentUsbKey)
     {
         watcher.Stop();
         Console.ForegroundColor = ConsoleColor.Green;
